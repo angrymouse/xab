@@ -281,10 +281,17 @@ ${opts.applicationStrategy}
 - If the target already has a different version of the same logic, merge both intents
 - Preserve the target's existing improvements — do not regress
 - Create or modify files as needed; delete files if the source commit deleted them
-- After applying, run exactly: git add -A && git commit -m "${commitMsg.replace(/"/g, '\\"')}"
-- You MUST create exactly ONE commit. Not zero, not two.
 - No conflict markers, dead code, or TODO placeholders
 - If impossible to apply cleanly, explain why in notes
+
+## CRITICAL — you MUST commit your changes
+After making all file changes, you MUST run these two commands as your FINAL action:
+
+    git add -A
+    git commit -m "${commitMsg.replace(/"/g, '\\"')}"
+
+If you do not run both commands, your work will be discarded. This is not optional.
+The validation system checks for exactly one new git commit. Zero commits = failure.
 
 Report what you did.`;
 
@@ -365,8 +372,15 @@ ${opts.reviewIssues.map((issue, i) => `${i + 1}. ${issue}`).join("\n")}
 - Read the affected files to understand the current state
 - Fix every issue the reviewer raised
 - Do NOT introduce new problems while fixing
-- After fixing, amend the commit: git add -A && git commit --amend -m "${commitMsg.replace(/"/g, '\\"')}"
 - The result must be a single clean commit with no issues
+
+## CRITICAL — you MUST amend the commit after fixing
+After making all fixes, you MUST run these two commands as your FINAL action:
+
+    git add -A
+    git commit --amend -m "${commitMsg.replace(/"/g, '\\"')}"
+
+If you do not run both commands, your fixes will be discarded. This is not optional.
 
 Report what you fixed.`;
 

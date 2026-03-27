@@ -17,6 +17,8 @@ export interface CommitValidation {
   newCommitCount: number;
   worktreeClean: boolean;
   conflictMarkers: string[];
+  /** Files left dirty (modified/untracked/etc) with status */
+  dirtyFiles: string[];
   errors: string[];
 }
 
@@ -256,12 +258,25 @@ export async function validateApply(worktreeGit: SimpleGit, beforeHash: string):
     conflicted.length === 0 &&
     notAdded.length === 0;
 
+  const dirtyFiles: string[] = [];
   if (!worktreeClean) {
     const parts: string[] = [];
-    if (modified.length) parts.push(`${modified.length} modified`);
-    if (notAdded.length) parts.push(`${notAdded.length} untracked`);
-    if (deleted.length) parts.push(`${deleted.length} deleted`);
-    if (conflicted.length) parts.push(`${conflicted.length} conflicted`);
+    if (modified.length) {
+      parts.push(`${modified.length} modified`);
+      for (const f of modified) dirtyFiles.push(`M ${f}`);
+    }
+    if (notAdded.length) {
+      parts.push(`${notAdded.length} untracked`);
+      for (const f of notAdded) dirtyFiles.push(`? ${f}`);
+    }
+    if (deleted.length) {
+      parts.push(`${deleted.length} deleted`);
+      for (const f of deleted) dirtyFiles.push(`D ${f}`);
+    }
+    if (conflicted.length) {
+      parts.push(`${conflicted.length} conflicted`);
+      for (const f of conflicted) dirtyFiles.push(`C ${f}`);
+    }
     errors.push(`Working tree not clean: ${parts.join(", ")}`);
   }
 
@@ -287,7 +302,15 @@ export async function validateApply(worktreeGit: SimpleGit, beforeHash: string):
     errors.push(`Conflict markers in: ${conflictMarkers.join(", ")}`);
   }
 
-  return { valid: errors.length === 0, newCommitHash, newCommitCount, worktreeClean, conflictMarkers, errors };
+  return {
+    valid: errors.length === 0,
+    newCommitHash,
+    newCommitCount,
+    worktreeClean,
+    conflictMarkers,
+    dirtyFiles,
+    errors,
+  };
 }
 
 export async function getAppliedDiff(worktreeGit: SimpleGit, beforeHash: string): Promise<string> {

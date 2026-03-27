@@ -129,7 +129,13 @@ export async function runBatch(opts: EngineOptions & { jsonl?: boolean }): Promi
     onAnalysis(commit: CommitInfo, analysis: CommitAnalysis) {
       if (jsonl) emitJsonl({ event: "analysis", hash: commit.hash, result: analysis });
       log(`  ${ts()} ${chalk.dim("analysis:")} ${analysisBadge(analysis.alreadyInTarget)}`);
-      log(`  ${chalk.dim("  summary:")} ${analysis.summary.slice(0, 120)}`);
+      log(`  ${chalk.dim("  summary:")} ${analysis.summary}`);
+      if (analysis.reasoning) {
+        log(`  ${chalk.dim("  reasoning:")} ${analysis.reasoning}`);
+      }
+      if (analysis.applicationStrategy && analysis.alreadyInTarget !== "yes") {
+        log(`  ${chalk.dim("  strategy:")} ${analysis.applicationStrategy}`);
+      }
       if (analysis.affectedComponents.length > 0) {
         log(`  ${chalk.dim("  components:")} ${analysis.affectedComponents.join(", ")}`);
       }
@@ -149,13 +155,24 @@ export async function runBatch(opts: EngineOptions & { jsonl?: boolean }): Promi
         });
       const duration = chalk.dim(`${(decision.durationMs / 1000).toFixed(1)}s`);
       log(`  ${ts()} ${decisionBadge(decision.kind)} ${duration}`);
+      if (decision.newCommitHash) {
+        log(`  ${chalk.dim("  commit:")} ${decision.newCommitHash.slice(0, 8)}`);
+      }
       if (decision.kind === "failed" && decision.error) {
-        log(`  ${chalk.red(`  error: ${decision.error.slice(0, 150)}`)}`);
+        log(`  ${chalk.red(`  error: ${decision.error}`)}`);
+      }
+      if (decision.reason && decision.kind !== "failed") {
+        log(`  ${chalk.dim("  reason:")} ${decision.reason}`);
       }
       if (decision.filesChanged && decision.filesChanged.length > 0) {
-        const shown = decision.filesChanged.slice(0, 5).join(", ");
-        const extra = decision.filesChanged.length > 5 ? chalk.dim(` +${decision.filesChanged.length - 5} more`) : "";
-        log(`  ${chalk.dim(`  files: ${shown}`)}${extra}`);
+        for (const f of decision.filesChanged) {
+          log(`  ${chalk.dim(`  · ${f}`)}`);
+        }
+      }
+      if (decision.opsNotes && decision.opsNotes.length > 0) {
+        for (const note of decision.opsNotes) {
+          log(`  ${chalk.yellow(`  ops: ${note}`)}`);
+        }
       }
     },
 

@@ -528,6 +528,11 @@ async function processOneCommit(o: ProcessOpts): Promise<Decision> {
 
     if (!validation.valid) {
       cb.onLog(`Validation failed: ${validation.errors.join("; ")}`, "red");
+      if (validation.dirtyFiles.length > 0) {
+        for (const f of validation.dirtyFiles) {
+          cb.onLog(`  ${f}`, "red");
+        }
+      }
       await resetHard(o.wtGit, headBefore);
       if (attempt === o.maxAttempts) return mkFailed(commit, "validation", validation.errors.join("; "), start);
       continue;
