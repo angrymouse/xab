@@ -1,42 +1,54 @@
-# backmerge
+# xab
 
 AI-powered curated branch reconciliation engine. Merges the _intent_ of source branch commits into a target branch that may have diverged significantly — not a blind cherry-pick.
 
-## Prerequisites
+## Install
 
 ```bash
-npm install -g @openai/codex        # Codex CLI (gpt-5.4 for analysis/apply)
-npm install -g @anthropic-ai/claude-code  # Claude Code (opus 4.6 for review)
-bun install                          # Project deps
+npm i -g xab
+```
+
+Also requires:
+
+```bash
+npm i -g @openai/codex           # Codex CLI (analysis/apply)
+npm i -g @anthropic-ai/claude-code  # Claude Code CLI (review)
 ```
 
 ## Quick start
 
 ```bash
 # Interactive TUI — select branches interactively
-bun run index.ts /path/to/repo
+xab /path/to/repo
 
 # With explicit refs
-bun run index.ts /path/to/repo --source-ref origin/main --target-ref origin/testnet
+xab /path/to/repo --source-ref origin/main --target-ref origin/testnet
 
 # Persistent work branch (resumes if exists)
-bun run index.ts /path/to/repo \
+xab /path/to/repo \
   --source-ref origin/main \
   --target-ref origin/testnet \
   --work-branch merged-testnet
 
 # Dry-run — analyze only, no commits
-bun run index.ts /path/to/repo \
+xab /path/to/repo \
   --source-ref origin/main --target-ref origin/testnet --dry-run --batch
 
 # List candidates only
-bun run index.ts /path/to/repo \
+xab /path/to/repo \
   --source-ref origin/main --target-ref origin/testnet --list-only
 
 # Batch mode — unattended, JSONL output
-bun run index.ts /path/to/repo --batch \
+xab /path/to/repo --batch \
   --source-ref origin/main --target-ref origin/testnet \
   --work-branch merged-testnet --fetch
+```
+
+If `.backmerge.json` exists in the target repo, refs are loaded from config — no flags needed:
+
+```bash
+xab /path/to/repo --list-only
+xab /path/to/repo --batch
 ```
 
 ## Pipeline
@@ -49,8 +61,9 @@ For each source commit since the merge base:
 4. **Auto-skip** — commits already in target are skipped by default
 5. **Apply** (Codex, gpt-5.4 high) — curated merge: adapts intent to target architecture
 6. **Validate** — exactly 1 new commit, clean worktree, no conflict markers
-7. **Review** (Claude, opus 4.6 high) — full code review of applied diff with repo context
-8. **Advance** — branch only moves forward after review approval
+7. **Review** (Claude, opus 4.6) — full code review of applied diff, can run tests
+8. **Fix loop** — if review rejects, objections sent back to Codex for correction (up to 2 rounds)
+9. **Advance** — persistent branch only moves forward after review approval (CAS-guarded)
 
 ## Decision model
 
@@ -129,6 +142,7 @@ Behavior:
   --fetch, -f             Fetch remotes first
   --no-review             Skip Claude review
   --no-auto-skip          Ask about every commit
+  --no-resume             Don't resume interrupted runs
   --max-attempts <n>      Retries per commit (default: 2)
   --config <path>         Config file path
 ```
@@ -142,6 +156,7 @@ Each run creates:
   metadata.json           # Run parameters
   results.jsonl           # Machine-readable event log
   summary.json            # Final summary + all decisions
+  progress.json           # Resume state (deleted on completion)
   commits/
     <hash>/
       source.patch        # Original commit diff
@@ -159,10 +174,10 @@ Each run creates:
 With `--work-branch`, the engine:
 
 - Creates the branch from `--target-ref` if it doesn't exist
-- Resumes from it if it already exists
+- Resumes from it if it already exists (auto-resume by default)
+- Operates in a **detached eval worktree** — the persistent branch is never checked out
+- Only advances the branch via **compare-and-swap** after validation + review approval
 - Use `--reset-work-branch` to force-reset to target
-
-This supports iterative curated merges over time.
 
 ## Exit codes (batch)
 
@@ -182,13 +197,13 @@ src/
   review.ts       Claude review: packets + execution (opus 4.6)
   audit.ts        Per-run logging + artifact storage
   git.ts          Git operations: worktree, cherry-pick, validation
-  app.tsx          Interactive TUI (ink/React)
+  app.tsx         Interactive TUI (ink/React)
   batch.ts        Unattended batch runner
 index.ts          CLI entry point
 ```
 
 ## Adapting to a new repo
 
-1. Run `backmerge /path/to/repo` — it works without config
+1. `npm i -g xab` then run `xab /path/to/repo` — works without config
 2. If merges need tuning, add `.backmerge.json` with doc routes and prompt hints
 3. No engine code changes needed — everything is config-driven

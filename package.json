@@ -1,13 +1,17 @@
 {
-  "name": "backmergerai",
-  "version": "0.1.0",
+  "name": "xab",
+  "version": "2.0.0",
   "description": "AI-powered curated branch reconciliation engine",
-  "module": "index.ts",
   "type": "module",
   "bin": {
-    "backmerge": "./index.ts"
+    "xab": "dist/index.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
+    "build": "bun build index.ts --outdir dist --target bun --format esm --external @anthropic-ai/claude-agent-sdk --external @openai/codex-sdk --external simple-git --external ink --external ink-select-input --external ink-spinner --external ink-text-input --external react",
+    "prepublishOnly": "bun run build",
     "start": "bun run index.ts",
     "dev": "bun run --watch index.ts"
   },

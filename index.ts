@@ -52,10 +52,10 @@ for (let i = 0; i < args.length; i++) {
 
 if (showHelp) {
   console.log(`
-backmerge — AI-powered curated branch reconciliation
+xab — AI-powered curated branch reconciliation
 
 Usage:
-  backmerge [repo-path] [options]
+  xab [repo-path] [options]
 
 Ref selection:
   --source-ref <ref>      Source branch/ref (where changes come FROM)
@@ -83,7 +83,7 @@ Behavior:
   --help, -h              Show this help
 
 Config:
-  Place .backmerge.json in the target repo for persistent settings:
+  Place .xab.json in the target repo for persistent settings:
   - sourceRef, targetRef, workBranch: default refs
   - instructionFiles: extra docs to include in AI context
   - docRoutes: map commit paths/keywords to relevant docs
@@ -104,7 +104,7 @@ Pipeline:
      e. Validate: exactly 1 clean commit, no conflict markers
      f. Claude (opus 4.6, high) reviews applied diff
      g. Branch advances only after review approval
-  5. Audit log + artifacts written to .backmerge/runs/
+  5. Audit log + artifacts written to .xab/runs/
 
 Models:
   - Analysis/Apply: gpt-5.4 (high reasoning effort) via Codex SDK
@@ -148,7 +148,7 @@ const engineOpts: Partial<EngineOptions> = {
 
 if (batch || listOnly) {
   if (!sourceRef || !targetRef) {
-    console.error("Error: --batch/--list-only requires --source-ref and --target-ref (via flags or .backmerge.json)");
+    console.error("Error: --batch/--list-only requires --source-ref and --target-ref (via flags or .xab.json)");
     process.exit(1);
   }
   const { runBatch } = await import("./src/batch.ts");
