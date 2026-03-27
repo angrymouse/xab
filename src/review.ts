@@ -162,7 +162,7 @@ If you have ANY objections, be specific about what's wrong and how to fix it. Yo
     options: {
       cwd: worktreePath,
       model: "claude-opus-4-6",
-      maxTurns: 30,
+      maxTurns: undefined,
       permissionMode: "default",
       outputFormat: reviewSchema,
       tools: ["Read", "Glob", "Grep", "Bash"],
