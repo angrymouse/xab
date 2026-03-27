@@ -55,8 +55,12 @@ for (let i = 0; i < args.length; i++) {
 }
 
 if (showHelp) {
+  let version = "?";
+  try {
+    version = JSON.parse(await Bun.file(new URL("./package.json", import.meta.url).pathname).text()).version;
+  } catch {}
   console.log(`
-xab — AI-powered curated branch reconciliation
+xab v${version} — AI-powered curated branch reconciliation
 
 Usage:
   xab [repo-path] [options]

@@ -7,7 +7,18 @@
  */
 
 import chalk from "chalk";
+import { readFileSync } from "fs";
+import { join } from "path";
 import { runEngine, type EngineOptions, type EngineCallbacks, type EngineResult } from "./engine.ts";
+
+function getVersion(): string {
+  try {
+    const pkg = JSON.parse(readFileSync(join(import.meta.dir, "..", "package.json"), "utf-8"));
+    return pkg.version ?? "?";
+  } catch {
+    return "?";
+  }
+}
 import type { CommitInfo } from "./git.ts";
 import type { CommitAnalysis } from "./codex.ts";
 import type { Decision } from "./decisions.ts";
@@ -93,8 +104,9 @@ export async function runBatch(opts: EngineOptions & { jsonl?: boolean }): Promi
   const startTime = Date.now();
 
   // ── Header ─────────────────────────────────────────────────────────
+  const version = getVersion();
   log("");
-  log(`  ${chalk.cyan.bold("xab")} ${chalk.dim("— curated branch reconciliation")}`);
+  log(`  ${chalk.cyan.bold("xab")} ${chalk.dim(`v${version}`)} ${chalk.dim("— curated branch reconciliation")}`);
   log(`  ${chalk.magenta(opts.sourceRef)} ${chalk.dim("→")} ${chalk.green(opts.targetRef)}`);
   if (opts.workBranch) log(`  ${chalk.dim("work branch:")} ${chalk.cyan(opts.workBranch)}`);
   if (opts.dryRun) log(`  ${chalk.yellow.bold("DRY RUN")}`);

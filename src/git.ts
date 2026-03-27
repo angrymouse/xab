@@ -260,24 +260,11 @@ export async function validateApply(worktreeGit: SimpleGit, beforeHash: string):
 
   const dirtyFiles: string[] = [];
   if (!worktreeClean) {
-    const parts: string[] = [];
-    if (modified.length) {
-      parts.push(`${modified.length} modified`);
-      for (const f of modified) dirtyFiles.push(`M ${f}`);
-    }
-    if (notAdded.length) {
-      parts.push(`${notAdded.length} untracked`);
-      for (const f of notAdded) dirtyFiles.push(`? ${f}`);
-    }
-    if (deleted.length) {
-      parts.push(`${deleted.length} deleted`);
-      for (const f of deleted) dirtyFiles.push(`D ${f}`);
-    }
-    if (conflicted.length) {
-      parts.push(`${conflicted.length} conflicted`);
-      for (const f of conflicted) dirtyFiles.push(`C ${f}`);
-    }
-    errors.push(`Working tree not clean: ${parts.join(", ")}`);
+    for (const f of modified) dirtyFiles.push(`M ${f}`);
+    for (const f of notAdded) dirtyFiles.push(`? ${f}`);
+    for (const f of deleted) dirtyFiles.push(`D ${f}`);
+    for (const f of conflicted) dirtyFiles.push(`C ${f}`);
+    errors.push(`Working tree not clean (${dirtyFiles.length} files): ${dirtyFiles.join(", ")}`);
   }
 
   const conflictMarkers: string[] = [];
