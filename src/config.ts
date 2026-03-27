@@ -61,7 +61,7 @@ const DEFAULT_CONFIG: BackmergeConfig = {
   promptHints: [],
   pathRemaps: [],
   reviewStrictness: "normal",
-  maxAttempts: 2,
+  maxAttempts: undefined,
   commitPrefix: "backmerge:",
 };
 

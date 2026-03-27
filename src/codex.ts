@@ -293,7 +293,9 @@ After making all file changes, you MUST run these two commands as your FINAL act
 If you do not run both commands, your work will be discarded. This is not optional.
 The validation system checks for exactly one new git commit. Zero commits = failure.
 
-Report what you did.`;
+Report what you did.
+
+MAKE SURE TO ACTUALLY GIT COMMIT, NOT JUST MODIFY FILES.`;
 
   const firstPrompt = `${MERGE_PREAMBLE}
 ${opts.repoContext ? `## Repository context\n${opts.repoContext}\n` : ""}
@@ -382,7 +384,9 @@ After making all fixes, you MUST run these two commands as your FINAL action:
 
 If you do not run both commands, your fixes will be discarded. This is not optional.
 
-Report what you fixed.`;
+Report what you fixed.
+
+MAKE SURE TO ACTUALLY GIT COMMIT, NOT JUST MODIFY FILES.`;
 
   const turn = await thread.run(prompt, { outputSchema: applyResultSchema });
   return parseJson<ApplyResult>(turn.finalResponse, {

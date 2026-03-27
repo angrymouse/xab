@@ -108,7 +108,7 @@ export async function runEngine(opts: EngineOptions, cb: EngineCallbacks): Promi
 
   // ── Config & context ─────────────────────────────────────────────────
   const config = loadConfig(repoPath, opts.configPath);
-  const effectiveMaxAttempts = opts.maxAttempts ?? config.maxAttempts ?? 2;
+  const effectiveMaxAttempts = opts.maxAttempts ?? config.maxAttempts ?? Infinity;
   const effectiveWorkBranch = opts.workBranch ?? config.workBranch;
   const commitPrefix = config.commitPrefix ?? "backmerge:";
 
@@ -500,7 +500,7 @@ async function processOneCommit(o: ProcessOpts): Promise<Decision> {
   for (let attempt = 1; attempt <= o.maxAttempts; attempt++) {
     const headBefore = await getHead(o.wtGit);
 
-    cb.onStatus(`Applying ${commit.hash.slice(0, 8)} (attempt ${attempt}/${o.maxAttempts})...`);
+    cb.onStatus(`Applying ${commit.hash.slice(0, 8)} (attempt ${attempt})...`);
     let applyResult: ApplyResult;
     try {
       applyResult = await applyCommit({
@@ -614,10 +614,10 @@ async function processOneCommit(o: ProcessOpts): Promise<Decision> {
         cb.onLog(`Review rejected: ${reviewResult.issues.join("; ")}`, "red");
 
         // ── Fix loop: send objections back to Codex ──────────────
-        const maxFixRounds = 2;
+        const maxFixRounds = Infinity;
         let fixed = false;
         for (let fixRound = 1; fixRound <= maxFixRounds; fixRound++) {
-          cb.onStatus(`Codex fixing review issues (round ${fixRound}/${maxFixRounds})...`);
+          cb.onStatus(`Codex fixing review issues (round ${fixRound})...`);
           try {
             await fixFromReview({
               worktreePath: o.wtPath,
@@ -690,7 +690,7 @@ async function processOneCommit(o: ProcessOpts): Promise<Decision> {
                 kind: "failed",
                 commitHash: commit.hash,
                 commitMessage: commit.message,
-                reason: `Review rejected after ${maxFixRounds} fix rounds: ${reviewResult.issues.join("; ")}`,
+                reason: `Review rejected after fix attempts: ${reviewResult.issues.join("; ")}`,
                 failedPhase: "review",
                 reviewApproved: false,
                 reviewIssues: reviewResult.issues,
@@ -706,7 +706,7 @@ async function processOneCommit(o: ProcessOpts): Promise<Decision> {
               kind: "failed",
               commitHash: commit.hash,
               commitMessage: commit.message,
-              reason: `Review rejected after ${maxFixRounds} fix rounds: ${reviewResult.issues.join("; ")}`,
+              reason: `Review rejected after fix attempts: ${reviewResult.issues.join("; ")}`,
               failedPhase: "review",
               reviewApproved: false,
               reviewIssues: reviewResult.issues,

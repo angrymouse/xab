@@ -85,7 +85,7 @@ Behavior:
   --no-fetch              Skip fetch (default)
   --no-review             Skip Claude review pass
   --no-auto-skip          Don't auto-skip commits AI identifies as present
-  --max-attempts <n>      Max retries per commit (default: 2)
+  --max-attempts <n>      Max retries per commit (default: unlimited)
   --no-resume             Don't resume from interrupted runs (default: auto-resume)
   --config <path>         Path to config file (default: auto-discover)
   --help, -h              Show this help
