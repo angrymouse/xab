@@ -250,9 +250,10 @@ export async function runEngine(opts: EngineOptions, cb: EngineCallbacks): Promi
   cb.onLog(`Eval worktree (detached): ${wtPath}`, "green");
   const wtGit = createGit(wtPath);
 
-  // ── Audit ────────────────────────────────────────────────────────────
+  // ── Audit — written to the repo root, NOT the eval worktree ─────────
+  // Writing inside the eval worktree would poison validation (untracked files)
   const runId = `run-${ts}`;
-  const audit = new AuditLogClass(wtPath, runId);
+  const audit = new AuditLogClass(repoPath, runId);
   const runMeta: RunMetadata = {
     runId,
     startedAt: new Date().toISOString(),

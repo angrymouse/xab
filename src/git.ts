@@ -241,19 +241,27 @@ export async function validateApply(worktreeGit: SimpleGit, beforeHash: string):
   }
 
   const status = await worktreeGit.status();
+  // Filter out .backmerge/ audit files from dirty checks — they're ours, not Codex's
+  const isOurs = (f: string) => f.startsWith(".backmerge/") || f.startsWith(".backmerge\\");
+  const modified = status.modified.filter((f) => !isOurs(f));
+  const created = status.created.filter((f) => !isOurs(f));
+  const deleted = status.deleted.filter((f) => !isOurs(f));
+  const notAdded = status.not_added.filter((f) => !isOurs(f));
+  const conflicted = status.conflicted.filter((f) => !isOurs(f));
+
   const worktreeClean =
-    status.modified.length === 0 &&
-    status.created.length === 0 &&
-    status.deleted.length === 0 &&
-    status.conflicted.length === 0 &&
-    status.not_added.length === 0;
+    modified.length === 0 &&
+    created.length === 0 &&
+    deleted.length === 0 &&
+    conflicted.length === 0 &&
+    notAdded.length === 0;
 
   if (!worktreeClean) {
     const parts: string[] = [];
-    if (status.modified.length) parts.push(`${status.modified.length} modified`);
-    if (status.not_added.length) parts.push(`${status.not_added.length} untracked`);
-    if (status.deleted.length) parts.push(`${status.deleted.length} deleted`);
-    if (status.conflicted.length) parts.push(`${status.conflicted.length} conflicted`);
+    if (modified.length) parts.push(`${modified.length} modified`);
+    if (notAdded.length) parts.push(`${notAdded.length} untracked`);
+    if (deleted.length) parts.push(`${deleted.length} deleted`);
+    if (conflicted.length) parts.push(`${conflicted.length} conflicted`);
     errors.push(`Working tree not clean: ${parts.join(", ")}`);
   }
 
@@ -292,7 +300,8 @@ export async function getAppliedDiffStat(worktreeGit: SimpleGit, beforeHash: str
 
 export async function resetHard(git: SimpleGit, ref: string): Promise<void> {
   await git.raw(["reset", "--hard", ref]);
-  await git.raw(["clean", "-fd"]);
+  // Clean untracked files but exclude .backmerge/ audit artifacts
+  await git.raw(["clean", "-fd", "--exclude=.backmerge"]);
 }
 
 // ─── Fetch / reset ───────────────────────────────────────────────────────────

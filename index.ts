@@ -23,6 +23,7 @@ let startAfter = "";
 let limit = 0;
 let configPath = "";
 let batch = false;
+let jsonl = false;
 let resume = true; // resume by default
 let showHelp = false;
 
@@ -30,7 +31,10 @@ for (let i = 0; i < args.length; i++) {
   const arg = args[i]!;
   if (arg === "--help" || arg === "-h") showHelp = true;
   else if (arg === "--batch" || arg === "-b") batch = true;
-  else if (arg === "--dry-run") dryRun = true;
+  else if (arg === "--jsonl") {
+    batch = true;
+    jsonl = true;
+  } else if (arg === "--dry-run") dryRun = true;
   else if (arg === "--list-only") listOnly = true;
   else if (arg === "--fetch" || arg === "-f") doFetch = true;
   else if (arg === "--no-fetch") doFetch = false;
@@ -157,6 +161,7 @@ if (batch || listOnly) {
     sourceRef,
     targetRef,
     ...engineOpts,
+    jsonl,
   } as EngineOptions);
   process.exit(exitCode);
 } else {

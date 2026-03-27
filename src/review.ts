@@ -177,7 +177,15 @@ You can:
 
 You MUST NOT modify the worktree in any way. No file writes, no git commits, no destructive commands.
 
-Run relevant tests if you can determine the test command from the repo. Your objections will be sent back to the apply agent for fixing, so be specific and actionable.`,
+Testing guidelines:
+- Only run tests that work without API keys, secrets, or external service connections
+- Before running a test, check if it needs env vars by reading the test file or relevant .env.example
+- If a test needs keys, only run it if you can see a .env file with those vars already populated
+- Prefer: type-checks (tsc --noEmit), linters (eslint), unit tests, build checks (forge build, go build)
+- Avoid: integration tests hitting external APIs, tests requiring running databases/services
+- If you can't determine whether a test needs keys, skip it — don't run and fail
+
+Your objections will be sent back to the apply agent for fixing, so be specific and actionable.`,
     },
   });
 
