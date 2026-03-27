@@ -104,25 +104,44 @@ export async function reviewAppliedDiff(
     lenient: "Focus on correctness and safety. Accept reasonable adaptations even if imperfect.",
   };
 
-  const prompt = `You are reviewing a curated merge commit. Codex adapted source commit ${packet.commitHash.slice(0, 8)} ("${packet.commitMessage}") from "${packet.sourceBranch}" and applied it to the worktree (based on "${packet.targetBranch}").
+  const prompt = `You are reviewing a curated merge commit. Codex adapted a source commit from "${packet.sourceBranch}" and applied it to this worktree (based on "${packet.targetBranch}").
 
-Your job: review the NEW commit that Codex just created. The diff below shows exactly what Codex changed. Verify it is correct, clean, and faithful to the source commit's intent.
+Your job: review the NEW commit Codex created. Verify it is correct, clean, and faithful to the source commit's intent while respecting the target's architecture.
 
-## What Codex was asked to do
-Source commit: ${packet.commitHash} — ${packet.commitMessage}
-Analysis: ${packet.analysis.summary}
-Strategy: ${packet.analysis.applicationStrategy}
+## Source commit (what was being backmerged)
+Hash: ${packet.commitHash}
+Message: ${packet.commitMessage}
+Branch: ${packet.sourceBranch}
+
+### Original source diff:
+\`\`\`diff
+${packet.sourcePatch.slice(0, 15000)}
+\`\`\`
+
+## Codex's analysis
+Summary: ${packet.analysis.summary}
+Already in target: ${packet.analysis.alreadyInTarget}
+Strategy used: ${packet.analysis.applicationStrategy}
 Components: ${packet.analysis.affectedComponents.join(", ")}
 
-## What Codex actually did (the commit you are reviewing):
+## Codex's applied commit (what you are reviewing)
+${
+  packet.newCommitHash
+    ? `Commit: ${packet.newCommitHash} (in this worktree)
+Run \`git show ${packet.newCommitHash.slice(0, 8)}\` to inspect it.`
+    : `Run \`git show HEAD\` to inspect it.`
+}
+
+### Applied diff:
 \`\`\`diff
 ${packet.appliedDiff.slice(0, 30000)}
 \`\`\`
 
-## Diff stat:
+### Diff stat:
 ${packet.appliedDiffStat}
 
-${packet.newCommitHash ? `The commit to review is ${packet.newCommitHash.slice(0, 8)} in this worktree. Use \`git show ${packet.newCommitHash.slice(0, 8)}\` to see it, and read the affected files to verify in context.` : `Use \`git log -1\` and \`git show HEAD\` to inspect the commit in the worktree.`}
+## Key question: does the applied commit correctly adapt the source commit's intent?
+Compare the source diff with the applied diff. The applied commit should capture the same behavior/fix but adapted for the target branch's codebase structure.
 
 ${packet.repoContext ? `## Repository context\n${packet.repoContext}\n` : ""}
 ${packet.relevantDocs ? `## Relevant documentation\n${packet.relevantDocs.slice(0, 5000)}\n` : ""}
