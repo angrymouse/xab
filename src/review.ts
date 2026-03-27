@@ -231,16 +231,25 @@ Your objections will be sent back to the apply agent for fixing, so be specific 
     }
 
     if (message.type === "result") {
-      if ("result" in message) {
-        resultText = message.result as string;
+      const msg = message as Record<string, unknown>;
+      // Structured output is in structured_output field, plain text in result
+      if (msg.structured_output) {
+        resultText =
+          typeof msg.structured_output === "string" ? msg.structured_output : JSON.stringify(msg.structured_output);
+      } else if (msg.result) {
+        resultText = msg.result as string;
       }
       break;
     }
   }
 
   if (!resultText) {
+    // Log what we actually got for debugging
+    if (onProgress) onProgress("review", "WARNING: no structured_output or result in review response");
     return { approved: false, issues: ["Review produced no output"], summary: "Review failed", confidence: "low" };
   }
+
+  if (onProgress) onProgress("review", `got ${resultText.length} chars of review output`);
 
   try {
     return JSON.parse(resultText) as ReviewResult;
