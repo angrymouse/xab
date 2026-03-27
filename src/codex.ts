@@ -138,6 +138,70 @@ function parseJson<T>(raw: string, fallback: T): T {
   return fallback;
 }
 
+// ─── Stream helper ───────────────────────────────────────────────────────────
+
+async function runStreamedWithProgress(
+  thread: ReturnType<InstanceType<typeof Codex>["startThread"]>,
+  prompt: string,
+  onProgress: ProgressFn | undefined,
+  turnOpts?: { outputSchema?: unknown },
+): Promise<string> {
+  if (!onProgress) {
+    const turn = await thread.run(prompt, turnOpts);
+    return turn.finalResponse;
+  }
+
+  const { events } = await thread.runStreamed(prompt, turnOpts);
+  let finalResponse = "";
+
+  for await (const event of events) {
+    if (event.type === "item.started" || event.type === "item.updated" || event.type === "item.completed") {
+      const item = event.item as Record<string, unknown>;
+      switch (item.type) {
+        case "command_execution": {
+          const cmd = (item.command as string) ?? "";
+          const status = item.status as string;
+          if (status === "in_progress") {
+            onProgress("exec", `$ ${cmd}`);
+          } else if (status === "completed") {
+            const output = (item.aggregated_output as string) ?? "";
+            if (output) {
+              const lines = output.split("\n").filter(Boolean);
+              for (const line of lines.slice(-3)) {
+                onProgress("exec", `  ${line.slice(0, 120)}`);
+              }
+            }
+          }
+          break;
+        }
+        case "file_change": {
+          const changes = (item.changes as Array<{ path: string; kind: string }>) ?? [];
+          for (const c of changes) {
+            onProgress("file", `${c.kind} ${c.path}`);
+          }
+          break;
+        }
+        case "reasoning": {
+          const text = (item.text as string) ?? "";
+          if (text && event.type === "item.completed") {
+            // Show first line of reasoning
+            onProgress("think", text.split("\n")[0]!.slice(0, 120));
+          }
+          break;
+        }
+        case "agent_message": {
+          if (event.type === "item.completed") {
+            finalResponse = (item.text as string) ?? "";
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  return finalResponse;
+}
+
 // ─── Curated merge preamble ──────────────────────────────────────────────────
 
 const MERGE_PREAMBLE = `## Important: this is a CURATED MERGE, not a blind cherry-pick
@@ -156,6 +220,8 @@ Rules:
 
 // ─── Analyze ─────────────────────────────────────────────────────────────────
 
+export type ProgressFn = (phase: string, msg: string) => void;
+
 export interface AnalyzeOptions {
   worktreePath: string;
   commitDiff: string;
@@ -165,13 +231,14 @@ export interface AnalyzeOptions {
   targetBranch: string;
   sourceLatestDiff: string;
   repoContext?: string;
+  onProgress?: ProgressFn;
 }
 
 export async function analyzeCommit(opts: AnalyzeOptions): Promise<CommitAnalysis> {
   const codex = new Codex();
   const thread = codex.startThread({
     workingDirectory: opts.worktreePath,
-    sandboxMode: "read-only",
+    sandboxMode: "danger-full-access",
     model: "gpt-5.4",
     modelReasoningEffort: "high",
   });
@@ -217,8 +284,8 @@ You are looking at a worktree based on the TARGET branch "${opts.targetBranch}".
    - Dependencies on external services being added or removed? → note what
    - If the commit is just normal code changes that only need a deploy+restart, leave opsNotes as []`;
 
-  // Feed additional diff chunks if needed, then get structured output
-  let turn;
+  // Feed additional diff chunks if needed, then get structured output with streaming
+  let response: string;
   if (diffChunks.length > 1) {
     await thread.run(firstPrompt);
     for (let i = 1; i < diffChunks.length - 1; i++) {
@@ -227,15 +294,17 @@ You are looking at a worktree based on the TARGET branch "${opts.targetBranch}".
       );
     }
     const lastIdx = diffChunks.length - 1;
-    turn = await thread.run(
+    response = await runStreamedWithProgress(
+      thread,
       `### Diff (part ${lastIdx + 1}/${diffChunks.length} — final):\n\`\`\`diff\n${diffChunks[lastIdx]}\n\`\`\`\n\nYou now have the complete diff. Analyze and produce your structured response.`,
+      opts.onProgress,
       { outputSchema: analysisSchema },
     );
   } else {
-    turn = await thread.run(firstPrompt, { outputSchema: analysisSchema });
+    response = await runStreamedWithProgress(thread, firstPrompt, opts.onProgress, { outputSchema: analysisSchema });
   }
-  return parseJson<CommitAnalysis>(turn.finalResponse, {
-    summary: turn.finalResponse.slice(0, 500),
+  return parseJson<CommitAnalysis>(response, {
+    summary: response.slice(0, 500),
     alreadyInTarget: "no",
     reasoning: "Could not parse structured output",
     applicationStrategy: "Manual review recommended",
@@ -256,13 +325,14 @@ export interface ApplyOptions {
   targetBranch: string;
   repoContext?: string;
   commitPrefix: string;
+  onProgress?: ProgressFn;
 }
 
 export async function applyCommit(opts: ApplyOptions): Promise<ApplyResult> {
   const codex = new Codex();
   const thread = codex.startThread({
     workingDirectory: opts.worktreePath,
-    sandboxMode: "workspace-write",
+    sandboxMode: "danger-full-access",
     model: "gpt-5.4",
     modelReasoningEffort: "high",
   });
@@ -310,7 +380,7 @@ ${diffChunks[0]}
 
 ${diffChunks.length > 1 ? "I will send the remaining diff parts next. Read them all before applying." : instructions}`;
 
-  let turn;
+  let response: string;
   if (diffChunks.length > 1) {
     await thread.run(firstPrompt);
     for (let i = 1; i < diffChunks.length - 1; i++) {
@@ -319,18 +389,20 @@ ${diffChunks.length > 1 ? "I will send the remaining diff parts next. Read them 
       );
     }
     const lastIdx = diffChunks.length - 1;
-    turn = await thread.run(
+    response = await runStreamedWithProgress(
+      thread,
       `### Diff (part ${lastIdx + 1}/${diffChunks.length} — final):\n\`\`\`diff\n${diffChunks[lastIdx]}\n\`\`\`\n\nYou now have the complete diff.\n\n${instructions}`,
+      opts.onProgress,
       { outputSchema: applyResultSchema },
     );
   } else {
-    turn = await thread.run(firstPrompt, { outputSchema: applyResultSchema });
+    response = await runStreamedWithProgress(thread, firstPrompt, opts.onProgress, { outputSchema: applyResultSchema });
   }
-  return parseJson<ApplyResult>(turn.finalResponse, {
+  return parseJson<ApplyResult>(response, {
     applied: false,
     filesChanged: [],
     commitMessage: commitMsg,
-    notes: turn.finalResponse.slice(0, 1000),
+    notes: response.slice(0, 1000),
     adaptations: "",
   });
 }
@@ -356,7 +428,7 @@ export async function fixFromReview(opts: FixOptions): Promise<ApplyResult> {
   const codex = new Codex();
   const thread = codex.startThread({
     workingDirectory: opts.worktreePath,
-    sandboxMode: "workspace-write",
+    sandboxMode: "danger-full-access",
     model: "gpt-5.4",
     modelReasoningEffort: "high",
   });
@@ -404,7 +476,7 @@ export async function peekSourceState(worktreePath: string, sourceBranch: string
   const codex = new Codex();
   const thread = codex.startThread({
     workingDirectory: worktreePath,
-    sandboxMode: "read-only",
+    sandboxMode: "danger-full-access",
     model: "gpt-5.4",
   });
 

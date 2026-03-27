@@ -114,6 +114,12 @@ export async function runBatch(opts: EngineOptions & { jsonl?: boolean }): Promi
   log("");
 
   const cb: EngineCallbacks = {
+    onProgress(phase, msg) {
+      if (jsonl) emitJsonl({ event: "progress", phase, msg });
+      const icon = phase === "apply" ? chalk.green("▸") : chalk.blue("▸");
+      log(`  ${ts()} ${icon} ${chalk.dim(msg)}`);
+    },
+
     onLog(msg, color) {
       if (jsonl) emitJsonl({ event: "log", msg, color });
       if (!msg) {

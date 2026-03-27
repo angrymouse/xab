@@ -71,6 +71,8 @@ export interface EngineOptions {
 export interface EngineCallbacks {
   onLog(msg: string, color?: string): void;
   onStatus(msg: string): void;
+  /** Real-time progress from Codex — file changes, commands, reasoning */
+  onProgress?(phase: string, msg: string): void;
   onCommitStart(commit: CommitInfo, index: number, total: number): void;
   onAnalysis(commit: CommitInfo, analysis: CommitAnalysis): void;
   onDecision(commit: CommitInfo, decision: Decision): void;
@@ -441,6 +443,7 @@ async function processOneCommit(o: ProcessOpts): Promise<Decision> {
       targetBranch: o.targetRef,
       sourceLatestDiff: o.sourceLatestDiff,
       repoContext: commitCtx.promptBlock,
+      onProgress: o.cb.onProgress ? (phase, msg) => o.cb.onProgress!("analyze", `[${phase}] ${msg}`) : undefined,
     });
     audit.writeAnalysis(commit.hash, 1, analysis as unknown as Record<string, unknown>);
     cb.onAnalysis(commit, analysis);
@@ -513,6 +516,7 @@ async function processOneCommit(o: ProcessOpts): Promise<Decision> {
         targetBranch: o.targetRef,
         repoContext: commitCtx.promptBlock,
         commitPrefix: o.commitPrefix,
+        onProgress: o.cb.onProgress ? (phase, msg) => o.cb.onProgress!("apply", `[${phase}] ${msg}`) : undefined,
       });
       audit.writeAnalysis(commit.hash, attempt, { ...analysis, applyResult } as unknown as Record<string, unknown>);
     } catch (e) {
