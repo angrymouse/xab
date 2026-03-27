@@ -522,9 +522,37 @@ async function processOneCommit(o: ProcessOpts): Promise<Decision> {
       continue;
     }
 
-    // ── Validate ───────────────────────────────────────────────────
+    // ── Validate (with rescue commit if Codex forgot) ─────────────
     cb.onStatus(`Validating ${commit.hash.slice(0, 8)}...`);
-    const validation = await validateApply(o.wtGit, headBefore);
+    let validation = await validateApply(o.wtGit, headBefore);
+
+    // Rescue: Codex changed files but didn't commit — commit on its behalf
+    if (
+      !validation.valid &&
+      validation.newCommitCount === 0 &&
+      !validation.worktreeClean &&
+      validation.dirtyFiles.length > 0
+    ) {
+      const realChanges = validation.dirtyFiles.filter((f) => !f.includes(".git-local/"));
+      if (realChanges.length > 0) {
+        cb.onLog(
+          `Codex left ${realChanges.length} changed files without committing — creating rescue commit`,
+          "yellow",
+        );
+        for (const f of realChanges) cb.onLog(`  ${f}`, "yellow");
+        const commitMsg = `${o.commitPrefix} ${commit.message} (from ${commit.hash.slice(0, 8)})`;
+        try {
+          await o.wtGit.raw(["add", "-A", "--", ".", ":!.git-local"]);
+          await o.wtGit.raw(["commit", "-m", commitMsg]);
+          validation = await validateApply(o.wtGit, headBefore);
+          if (validation.valid) {
+            cb.onLog(`Rescue commit succeeded`, "green");
+          }
+        } catch (e) {
+          cb.onLog(`Rescue commit failed: ${(e as Error).message}`, "red");
+        }
+      }
+    }
 
     if (!validation.valid) {
       cb.onLog(`Validation failed: ${validation.errors.join("; ")}`, "red");

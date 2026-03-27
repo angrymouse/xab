@@ -243,13 +243,18 @@ export async function validateApply(worktreeGit: SimpleGit, beforeHash: string):
   }
 
   const status = await worktreeGit.status();
-  // Filter out .backmerge/ audit files from dirty checks — they're ours, not Codex's
-  const isOurs = (f: string) => f.startsWith(".backmerge/") || f.startsWith(".backmerge\\");
-  const modified = status.modified.filter((f) => !isOurs(f));
-  const created = status.created.filter((f) => !isOurs(f));
-  const deleted = status.deleted.filter((f) => !isOurs(f));
-  const notAdded = status.not_added.filter((f) => !isOurs(f));
-  const conflicted = status.conflicted.filter((f) => !isOurs(f));
+  // Filter out infrastructure artifacts from dirty checks
+  // .backmerge/ = our audit files, .git-local/ = Codex sandbox artifacts
+  const isInfra = (f: string) =>
+    f.startsWith(".backmerge/") ||
+    f.startsWith(".backmerge\\") ||
+    f.startsWith(".git-local/") ||
+    f.startsWith(".git-local\\");
+  const modified = status.modified.filter((f) => !isInfra(f));
+  const created = status.created.filter((f) => !isInfra(f));
+  const deleted = status.deleted.filter((f) => !isInfra(f));
+  const notAdded = status.not_added.filter((f) => !isInfra(f));
+  const conflicted = status.conflicted.filter((f) => !isInfra(f));
 
   const worktreeClean =
     modified.length === 0 &&
@@ -310,8 +315,8 @@ export async function getAppliedDiffStat(worktreeGit: SimpleGit, beforeHash: str
 
 export async function resetHard(git: SimpleGit, ref: string): Promise<void> {
   await git.raw(["reset", "--hard", ref]);
-  // Clean untracked files but exclude .backmerge/ audit artifacts
-  await git.raw(["clean", "-fd", "--exclude=.backmerge"]);
+  // Clean untracked files but exclude infrastructure artifacts
+  await git.raw(["clean", "-fd", "--exclude=.backmerge", "--exclude=.git-local"]);
 }
 
 // ─── Fetch / reset ───────────────────────────────────────────────────────────
