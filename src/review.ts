@@ -102,25 +102,25 @@ export async function reviewAppliedDiff(
     lenient: "Focus on correctness and safety. Accept reasonable adaptations even if imperfect.",
   };
 
-  const prompt = `You are reviewing a curated merge. A commit from "${packet.sourceBranch}" was applied to a branch based on "${packet.targetBranch}".
+  const prompt = `You are reviewing a curated merge commit. Codex adapted source commit ${packet.commitHash.slice(0, 8)} ("${packet.commitMessage}") from "${packet.sourceBranch}" and applied it to the worktree (based on "${packet.targetBranch}").
 
-## Codex analysis of the source commit
-Summary: ${packet.analysis.summary}
-Decision: alreadyInTarget=${packet.analysis.alreadyInTarget}
+Your job: review the NEW commit that Codex just created. The diff below shows exactly what Codex changed. Verify it is correct, clean, and faithful to the source commit's intent.
+
+## What Codex was asked to do
+Source commit: ${packet.commitHash} — ${packet.commitMessage}
+Analysis: ${packet.analysis.summary}
 Strategy: ${packet.analysis.applicationStrategy}
-Affected components: ${packet.analysis.affectedComponents.join(", ")}
+Components: ${packet.analysis.affectedComponents.join(", ")}
 
-## Source commit
-Hash: ${packet.commitHash}
-Message: ${packet.commitMessage}
-
-## Applied diff (what was actually committed):
+## What Codex actually did (the commit you are reviewing):
 \`\`\`diff
 ${packet.appliedDiff.slice(0, 30000)}
 \`\`\`
 
 ## Diff stat:
 ${packet.appliedDiffStat}
+
+Use \`git log -1\` and \`git show HEAD\` to inspect the actual commit in the worktree.
 
 ${packet.repoContext ? `## Repository context\n${packet.repoContext}\n` : ""}
 ${packet.relevantDocs ? `## Relevant documentation\n${packet.relevantDocs.slice(0, 5000)}\n` : ""}
