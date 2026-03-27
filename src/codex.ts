@@ -162,18 +162,31 @@ async function runStreamedWithProgress(
           const cmd = (item.command as string) ?? "";
           const status = item.status as string;
           if (status === "in_progress") {
+            // Unwrap /bin/bash -lc '...' wrapper that Codex uses
+            const inner = cmd.replace(/^\/bin\/(?:ba)?sh\s+-\w+\s+['"](.*)['"]$/s, "$1") || cmd;
+
             // Detect file-read patterns and label them nicely
-            const readMatch = cmd.match(/\b(?:cat|head|tail|less|bat)\s+['"]?([^\s'"]+)/);
-            const sedMatch = cmd.match(/\bsed\s+-n\s+['"]?\d+.*?['"]?\s+['"]?([^\s'"]+)/);
-            const rgMatch = cmd.match(/\brg\s+(?:-[^\s]+\s+)*['"]?([^'"]+?)['"]?\s+([^\s]+)/);
+            const readMatch = inner.match(/\b(?:cat|head|tail|less|bat|nl)\s+(?:-\w+\s+)*['"]?([^\s'"|\]]+)/);
+            const sedMatch = inner.match(/\bsed\s+-n\s+['"]?\d+.*?['"]?\s+['"]?([^\s'"]+)/);
+            const rgMatch = inner.match(/\brg\s+(?:-[^\s]+\s+)*['"]?(.+?)['"]?\s+(\S+)/);
+            const gitShowMatch = inner.match(/\bgit\s+show\s+(\S+)/);
+            const gitDiffMatch = inner.match(/\bgit\s+diff\b/);
+            const gitLogMatch = inner.match(/\bgit\s+log\b/);
+
             if (readMatch) {
               onProgress("read", readMatch[1]!);
             } else if (sedMatch) {
               onProgress("read", sedMatch[1]!);
             } else if (rgMatch) {
               onProgress("grep", `"${rgMatch[1]}" in ${rgMatch[2]}`);
+            } else if (gitShowMatch) {
+              onProgress("read", `git show ${gitShowMatch[1]}`);
+            } else if (gitDiffMatch) {
+              onProgress("exec", `$ ${inner.slice(0, 120)}`);
+            } else if (gitLogMatch) {
+              onProgress("exec", `$ ${inner.slice(0, 120)}`);
             } else {
-              onProgress("exec", `$ ${cmd.slice(0, 120)}`);
+              onProgress("exec", `$ ${inner.slice(0, 120)}`);
             }
           } else if (status === "completed") {
             const output = (item.aggregated_output as string) ?? "";
@@ -212,14 +225,26 @@ async function runStreamedWithProgress(
         }
         case "reasoning": {
           const text = (item.text as string) ?? "";
-          if (text && event.type === "item.completed") {
-            onProgress("think", text.split("\n")[0]!.slice(0, 120));
+          if (text) {
+            // Show reasoning as it arrives (both started and completed)
+            const lines = text.split("\n").filter(Boolean);
+            for (const line of lines.slice(0, 3)) {
+              onProgress("think", line.slice(0, 150));
+            }
           }
           break;
         }
         case "agent_message": {
+          const text = (item.text as string) ?? "";
           if (event.type === "item.completed") {
-            finalResponse = (item.text as string) ?? "";
+            finalResponse = text;
+          }
+          // Show intermediate agent text (planning, explaining what it's doing)
+          if (event.type === "item.updated" && text) {
+            const lastLine = text.split("\n").filter(Boolean).pop();
+            if (lastLine && lastLine.length > 10) {
+              onProgress("think", lastLine.slice(0, 150));
+            }
           }
           break;
         }
