@@ -91,7 +91,11 @@ export function writeReviewPacket(audit: AuditLog, packet: ReviewPacket, attempt
 
 // ─── Execute Claude review ───────────────────────────────────────────────────
 
-export async function reviewAppliedDiff(worktreePath: string, packet: ReviewPacket): Promise<ReviewResult> {
+export async function reviewAppliedDiff(
+  worktreePath: string,
+  packet: ReviewPacket,
+  onProgress?: (phase: string, msg: string) => void,
+): Promise<ReviewResult> {
   const strictnessInstructions = {
     strict: "Be very strict. Any questionable change should be rejected. Err on the side of caution.",
     normal: "Be thorough but reasonable. Reject clear issues, accept minor style differences.",
@@ -175,14 +179,20 @@ You can:
 - Run tests, linters, type-checkers, and build commands via Bash to verify correctness
 - Run any read-only shell command (cat, ls, git diff, git log, etc.)
 
-You MUST NOT modify the worktree in any way. No file writes, no git commits, no destructive commands.
+You MUST NOT modify the worktree. Specifically:
+- NO file writes, edits, or creates
+- NO git commit, git add, git reset, or any git mutation
+- NO npm install, bun install, yarn install, pnpm install, or any package manager install
+- NO rm, mv, cp, or any file mutation commands
+- NO pip install, cargo build, go get, or anything that writes to disk
 
 Testing guidelines:
+- Only run tests that work without installing dependencies (assume deps are already installed if node_modules exists)
 - Only run tests that work without API keys, secrets, or external service connections
 - Before running a test, check if it needs env vars by reading the test file or relevant .env.example
-- If a test needs keys, only run it if you can see a .env file with those vars already populated
 - Prefer: type-checks (tsc --noEmit), linters (eslint), unit tests, build checks (forge build, go build)
 - Avoid: integration tests hitting external APIs, tests requiring running databases/services
+- Do NOT run bun install, npm install, or equivalent — deps are already there if they exist
 - If you can't determine whether a test needs keys, skip it — don't run and fail
 
 Your objections will be sent back to the apply agent for fixing, so be specific and actionable.`,
@@ -191,6 +201,35 @@ Your objections will be sent back to the apply agent for fixing, so be specific 
 
   let resultText = "";
   for await (const message of q) {
+    // Stream progress from Claude's tool use
+    if (onProgress && message.type === "assistant") {
+      const betaMsg = (message as Record<string, unknown>).message as Record<string, unknown> | undefined;
+      const content = betaMsg?.content as Array<Record<string, unknown>> | undefined;
+      if (content) {
+        for (const block of content) {
+          if (block.type === "tool_use") {
+            const name = block.name as string;
+            const input = block.input as Record<string, unknown>;
+            if (name === "Bash") {
+              onProgress("review", `$ ${((input.command as string) ?? "").slice(0, 120)}`);
+            } else if (name === "Read") {
+              onProgress("review", `read ${((input.file_path as string) ?? "").replace(worktreePath + "/", "")}`);
+            } else if (name === "Grep") {
+              onProgress("review", `grep "${((input.pattern as string) ?? "").slice(0, 60)}"`);
+            } else if (name === "Glob") {
+              onProgress("review", `glob ${((input.pattern as string) ?? "").slice(0, 60)}`);
+            } else {
+              onProgress("review", `${name}`);
+            }
+          } else if (block.type === "text" && typeof block.text === "string" && block.text.length > 0) {
+            // Show first line of Claude's thinking
+            const firstLine = block.text.split("\n")[0]!.slice(0, 120);
+            if (firstLine) onProgress("review", firstLine);
+          }
+        }
+      }
+    }
+
     if (message.type === "result") {
       if ("result" in message) {
         resultText = message.result as string;
@@ -237,21 +276,28 @@ export async function verifyReviewIntegrity(wtGit: SimpleGit, expectedHead: stri
     return `Review mutated HEAD: expected ${expectedHead.slice(0, 8)}, got ${currentHead.slice(0, 8)}`;
   }
 
-  // Check no uncommitted changes
+  // Check no uncommitted changes (filter infra/reviewer artifacts)
   const status = await wtGit.status();
-  const dirty =
-    status.modified.length +
-    status.created.length +
-    status.deleted.length +
-    status.not_added.length +
-    status.conflicted.length;
+  const isInfra = (f: string) =>
+    f.startsWith(".backmerge/") ||
+    f.startsWith(".git-local/") ||
+    f.startsWith("node_modules/") ||
+    f.startsWith(".cache/") ||
+    f.startsWith("dist/") ||
+    f.startsWith("build/") ||
+    f.startsWith("target/");
+  const modified = status.modified.filter((f) => !isInfra(f));
+  const created = status.created.filter((f) => !isInfra(f));
+  const deleted = status.deleted.filter((f) => !isInfra(f));
+  const notAdded = status.not_added.filter((f) => !isInfra(f));
+  const dirty = modified.length + created.length + deleted.length + notAdded.length + status.conflicted.length;
 
   if (dirty > 0) {
     const parts: string[] = [];
-    if (status.modified.length) parts.push(`${status.modified.length} modified`);
-    if (status.created.length) parts.push(`${status.created.length} staged`);
-    if (status.not_added.length) parts.push(`${status.not_added.length} untracked`);
-    if (status.deleted.length) parts.push(`${status.deleted.length} deleted`);
+    if (modified.length) parts.push(`${modified.length} modified`);
+    if (notAdded.length) parts.push(`${notAdded.length} untracked`);
+    if (deleted.length) parts.push(`${deleted.length} deleted`);
+    if (status.conflicted.length) parts.push(`${status.conflicted.length} conflicted`);
     return `Review left dirty worktree: ${parts.join(", ")}`;
   }
 

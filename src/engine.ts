@@ -595,7 +595,7 @@ async function processOneCommit(o: ProcessOpts): Promise<Decision> {
         writeReviewPacket(audit, packet, attempt);
 
         const headBeforeReview = await getHead(o.wtGit);
-        reviewResult = await reviewAppliedDiff(o.wtPath, packet);
+        reviewResult = await reviewAppliedDiff(o.wtPath, packet, o.cb.onProgress);
         audit.writeReviewResult(commit.hash, attempt, reviewResult as unknown as Record<string, unknown>);
 
         // Verify reviewer didn't mutate the worktree
@@ -656,7 +656,7 @@ async function processOneCommit(o: ProcessOpts): Promise<Decision> {
               appliedDiffStat: fixedStat,
             };
             const headBeforeReReview = await getHead(o.wtGit);
-            reviewResult = await reviewAppliedDiff(o.wtPath, fixPacket);
+            reviewResult = await reviewAppliedDiff(o.wtPath, fixPacket, o.cb.onProgress);
             audit.writeReviewResult(commit.hash, attempt, {
               ...(reviewResult as unknown as Record<string, unknown>),
               fixRound,
