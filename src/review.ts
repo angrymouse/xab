@@ -22,6 +22,8 @@ export interface ReviewResult {
 export interface ReviewPacket {
   commitHash: string;
   commitMessage: string;
+  /** The actual commit hash Codex created in the worktree */
+  newCommitHash?: string;
   sourceBranch: string;
   targetBranch: string;
   analysis: CommitAnalysis;
@@ -120,7 +122,7 @@ ${packet.appliedDiff.slice(0, 30000)}
 ## Diff stat:
 ${packet.appliedDiffStat}
 
-Use \`git log -1\` and \`git show HEAD\` to inspect the actual commit in the worktree.
+${packet.newCommitHash ? `The commit to review is ${packet.newCommitHash.slice(0, 8)} in this worktree. Use \`git show ${packet.newCommitHash.slice(0, 8)}\` to see it, and read the affected files to verify in context.` : `Use \`git log -1\` and \`git show HEAD\` to inspect the commit in the worktree.`}
 
 ${packet.repoContext ? `## Repository context\n${packet.repoContext}\n` : ""}
 ${packet.relevantDocs ? `## Relevant documentation\n${packet.relevantDocs.slice(0, 5000)}\n` : ""}

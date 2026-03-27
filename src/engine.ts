@@ -582,6 +582,7 @@ async function processOneCommit(o: ProcessOpts): Promise<Decision> {
         packet = {
           commitHash: commit.hash,
           commitMessage: commit.message,
+          newCommitHash: validation.newCommitHash ?? undefined,
           sourceBranch: o.sourceRef,
           targetBranch: o.targetRef,
           analysis,
