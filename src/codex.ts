@@ -162,7 +162,19 @@ async function runStreamedWithProgress(
           const cmd = (item.command as string) ?? "";
           const status = item.status as string;
           if (status === "in_progress") {
-            onProgress("exec", `$ ${cmd}`);
+            // Detect file-read patterns and label them nicely
+            const readMatch = cmd.match(/\b(?:cat|head|tail|less|bat)\s+['"]?([^\s'"]+)/);
+            const sedMatch = cmd.match(/\bsed\s+-n\s+['"]?\d+.*?['"]?\s+['"]?([^\s'"]+)/);
+            const rgMatch = cmd.match(/\brg\s+(?:-[^\s]+\s+)*['"]?([^'"]+?)['"]?\s+([^\s]+)/);
+            if (readMatch) {
+              onProgress("read", readMatch[1]!);
+            } else if (sedMatch) {
+              onProgress("read", sedMatch[1]!);
+            } else if (rgMatch) {
+              onProgress("grep", `"${rgMatch[1]}" in ${rgMatch[2]}`);
+            } else {
+              onProgress("exec", `$ ${cmd.slice(0, 120)}`);
+            }
           } else if (status === "completed") {
             const output = (item.aggregated_output as string) ?? "";
             if (output) {
@@ -181,10 +193,26 @@ async function runStreamedWithProgress(
           }
           break;
         }
+        case "mcp_tool_call": {
+          const tool = (item.tool as string) ?? "";
+          const args = (item.arguments as Record<string, unknown>) ?? {};
+          const status = item.status as string;
+          if (status === "in_progress") {
+            if (tool.toLowerCase().includes("read")) {
+              onProgress("read", ((args.file_path as string) ?? (args.path as string) ?? tool).slice(0, 120));
+            } else if (tool.toLowerCase().includes("grep") || tool.toLowerCase().includes("search")) {
+              onProgress("grep", `"${((args.pattern as string) ?? "").slice(0, 60)}" ${args.path ?? ""}`);
+            } else if (tool.toLowerCase().includes("glob") || tool.toLowerCase().includes("find")) {
+              onProgress("glob", ((args.pattern as string) ?? (args.path as string) ?? tool).slice(0, 120));
+            } else {
+              onProgress("tool", `${tool} ${JSON.stringify(args).slice(0, 80)}`);
+            }
+          }
+          break;
+        }
         case "reasoning": {
           const text = (item.text as string) ?? "";
           if (text && event.type === "item.completed") {
-            // Show first line of reasoning
             onProgress("think", text.split("\n")[0]!.slice(0, 120));
           }
           break;

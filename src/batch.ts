@@ -116,8 +116,36 @@ export async function runBatch(opts: EngineOptions & { jsonl?: boolean }): Promi
   const cb: EngineCallbacks = {
     onProgress(phase, msg) {
       if (jsonl) emitJsonl({ event: "progress", phase, msg });
+
+      // Extract the sub-type from messages like "analyze: [read] file.ts"
+      // The engine wraps progress as "[sub] msg", but codex.ts sends raw sub-types
+      const subMatch = msg.match(/^\[(\w+)\]\s*(.*)/);
+      const sub = subMatch ? subMatch[1]! : phase;
+      const text = subMatch ? subMatch[2]! : msg;
+
       let icon: string;
-      switch (phase) {
+      switch (sub) {
+        case "read":
+          icon = chalk.cyan("📖");
+          break;
+        case "grep":
+          icon = chalk.cyan("🔍");
+          break;
+        case "glob":
+          icon = chalk.cyan("📂");
+          break;
+        case "exec":
+          icon = chalk.yellow("⚡");
+          break;
+        case "file":
+          icon = chalk.green("✏️");
+          break;
+        case "think":
+          icon = chalk.blue("💭");
+          break;
+        case "tool":
+          icon = chalk.dim("🔧");
+          break;
         case "analyze":
           icon = chalk.blue("◆");
           break;
@@ -131,7 +159,7 @@ export async function runBatch(opts: EngineOptions & { jsonl?: boolean }): Promi
           icon = chalk.dim("·");
           break;
       }
-      log(`  ${ts()} ${icon} ${chalk.dim(msg)}`);
+      log(`  ${ts()} ${icon} ${chalk.dim(text)}`);
     },
 
     onLog(msg, color) {
