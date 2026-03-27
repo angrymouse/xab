@@ -490,6 +490,27 @@ export default function App({ repoPath, engineOpts }: AppProps) {
             {result.workBranch && <Text dimColor>Branch: {result.workBranch}</Text>}
             {result.auditDir && <Text dimColor>Audit: {result.auditDir}</Text>}
           </Box>
+          {result.opsNotes.length > 0 && (
+            <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={1} marginTop={1}>
+              <Text bold color="yellow">
+                Operator Notes
+              </Text>
+              <Newline />
+              {result.opsNotes.map((entry) => (
+                <Box key={entry.commitHash} flexDirection="column">
+                  <Text color="yellow">
+                    {entry.commitHash.slice(0, 8)} {entry.commitMessage}
+                  </Text>
+                  {entry.notes.map((note, i) => (
+                    <Text key={i} color="yellow">
+                      {" "}
+                      → {note}
+                    </Text>
+                  ))}
+                </Box>
+              ))}
+            </Box>
+          )}
           <ActionBar actions={[{ key: "q", label: "Exit", color: "gray" }]} />
         </Box>
       )}

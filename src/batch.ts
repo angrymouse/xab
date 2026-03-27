@@ -40,6 +40,7 @@ export async function runBatch(opts: EngineOptions): Promise<number> {
       worktree: result.worktreePath,
       branch: result.workBranch,
       auditDir: result.auditDir,
+      opsNotes: result.opsNotes,
     });
 
     const { summary } = result;

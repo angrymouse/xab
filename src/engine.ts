@@ -88,6 +88,8 @@ export interface EngineResult {
   workBranch: string;
   auditDir: string;
   commits: CommitInfo[];
+  /** Aggregated operator notes from all applied/would_apply commits */
+  opsNotes: Array<{ commitHash: string; commitMessage: string; notes: string[] }>;
 }
 
 // ─── Main engine ─────────────────────────────────────────────────────────────
@@ -162,6 +164,7 @@ export async function runEngine(opts: EngineOptions, cb: EngineCallbacks): Promi
       workBranch: "",
       auditDir: "",
       commits: [],
+      opsNotes: [],
     };
   }
 
@@ -211,6 +214,7 @@ export async function runEngine(opts: EngineOptions, cb: EngineCallbacks): Promi
       workBranch: "",
       auditDir: "",
       commits: commitsToProcess,
+      opsNotes: [],
     };
   }
 
@@ -341,6 +345,23 @@ export async function runEngine(opts: EngineOptions, cb: EngineCallbacks): Promi
   // ── Finalize ─────────────────────────────────────────────────────────
   audit.runEnd(summary, decisions);
 
+  // Collect ops notes from all decisions that have them
+  const opsNotes = decisions
+    .filter((d) => d.opsNotes && d.opsNotes.length > 0)
+    .map((d) => ({ commitHash: d.commitHash, commitMessage: d.commitMessage, notes: d.opsNotes! }));
+
+  if (opsNotes.length > 0) {
+    cb.onLog("", "gray");
+    cb.onLog("═══ OPERATOR NOTES ═══", "yellow");
+    for (const entry of opsNotes) {
+      cb.onLog(`  ${entry.commitHash.slice(0, 8)} ${entry.commitMessage}:`, "yellow");
+      for (const note of entry.notes) {
+        cb.onLog(`    → ${note}`, "yellow");
+      }
+    }
+    cb.onLog("═══════════════════════", "yellow");
+  }
+
   return {
     summary,
     decisions,
@@ -348,6 +369,7 @@ export async function runEngine(opts: EngineOptions, cb: EngineCallbacks): Promi
     workBranch: wbName,
     auditDir: audit.runDir,
     commits: commitsToProcess,
+    opsNotes,
   };
 }
 
@@ -440,12 +462,12 @@ async function processOneCommit(o: ProcessOpts): Promise<Decision> {
 
   // ── Dry-run: stop here ─────────────────────────────────────────────
   if (o.dryRun) {
-    const kind = analysis.alreadyInTarget === "partial" ? "would_apply" : "would_apply";
     return {
-      kind,
+      kind: "would_apply" as const,
       commitHash: commit.hash,
       commitMessage: commit.message,
       reason: analysis.applicationStrategy.slice(0, 300),
+      opsNotes: analysis.opsNotes.length > 0 ? analysis.opsNotes : undefined,
       durationMs: Date.now() - start,
     };
   }
@@ -674,6 +696,7 @@ async function processOneCommit(o: ProcessOpts): Promise<Decision> {
       newCommitHash: validation.newCommitHash ?? undefined,
       filesChanged: applyResult.filesChanged,
       reviewApproved: o.review ? true : undefined,
+      opsNotes: analysis.opsNotes.length > 0 ? analysis.opsNotes : undefined,
       durationMs: Date.now() - start,
     };
 

@@ -29,6 +29,8 @@ export interface Decision {
   error?: string;
   /** Which phase failed: analysis | apply | validation | review */
   failedPhase?: string;
+  /** Operator action notes — env vars, migrations, infra changes needed */
+  opsNotes?: string[];
   /** Duration of the full decision pipeline in ms */
   durationMs: number;
 }

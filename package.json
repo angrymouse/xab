@@ -1,11 +1,12 @@
 {
   "name": "xab",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "AI-powered curated branch reconciliation engine",
   "type": "module",
   "bin": {
     "xab": "dist/index.js"
   },
+  "private":false,
   "files": [
     "dist"
   ],

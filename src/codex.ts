@@ -16,6 +16,8 @@ export interface CommitAnalysis {
   reasoning: string;
   applicationStrategy: string;
   affectedComponents: string[];
+  /** Ops notes — only populated when the commit requires operator action beyond a code deploy */
+  opsNotes: string[];
 }
 
 export interface ApplyResult {
@@ -46,8 +48,14 @@ const analysisSchema = {
       items: { type: "string" },
       description: "Top-level directories/components affected (e.g. 'api', 'frontend', 'contracts')",
     },
+    opsNotes: {
+      type: "array",
+      items: { type: "string" },
+      description:
+        "Operator action items ONLY if this commit requires something beyond a standard code deploy+restart. Examples: new env vars to add, database migrations to run, new services to deploy, infrastructure changes, config file updates on servers. Leave as empty array [] if no operator action is needed — a normal code deploy does NOT count.",
+    },
   },
-  required: ["summary", "alreadyInTarget", "reasoning", "applicationStrategy", "affectedComponents"],
+  required: ["summary", "alreadyInTarget", "reasoning", "applicationStrategy", "affectedComponents", "opsNotes"],
   additionalProperties: false,
 } as const;
 
@@ -200,7 +208,14 @@ You are looking at a worktree based on the TARGET branch "${opts.targetBranch}".
    - "no" = missing
 4. If not fully present, describe a step-by-step strategy for applying cleanly
 5. List which top-level components/directories are affected
-6. Consider: does this change make sense for the target? Is it useful?`;
+6. Consider: does this change make sense for the target? Is it useful?
+7. Check if this commit requires any operator action beyond a normal code deploy:
+   - New environment variables added to .env / .env.example? → note which ones
+   - Database schema changes or migrations? → note what to run
+   - New services, containers, or infrastructure to deploy? → note what
+   - Config files that need manual updates on servers? → note which
+   - Dependencies on external services being added or removed? → note what
+   - If the commit is just normal code changes that only need a deploy+restart, leave opsNotes as []`;
 
   // Feed additional diff chunks if needed, then get structured output
   let turn;
@@ -225,6 +240,7 @@ You are looking at a worktree based on the TARGET branch "${opts.targetBranch}".
     reasoning: "Could not parse structured output",
     applicationStrategy: "Manual review recommended",
     affectedComponents: [],
+    opsNotes: [],
   });
 }
 
