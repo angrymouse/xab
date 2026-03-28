@@ -266,49 +266,49 @@ export async function runEngine(opts: EngineOptions, cb: EngineCallbacks): Promi
   cb.onLog(`Eval worktree (detached): ${wtPath}`, "green");
   const wtGit = createGit(wtPath);
 
-  // ── Audit — written to the repo root, NOT the eval worktree ─────────
-  // Writing inside the eval worktree would poison validation (untracked files)
-  const runId = `run-${ts}`;
-  const audit = new AuditLogClass(repoPath, runId);
-  const runMeta: RunMetadata = {
-    runId,
-    startedAt: new Date().toISOString(),
-    sourceRef,
-    targetRef,
-    workBranch: wbName,
-    mergeBase,
-    worktreePath: wtPath,
-    totalCandidates: commitsToProcess.length,
-    cherrySkipped: cherrySkipped.size,
-    dryRun,
-    repoPath,
-  };
-  audit.runStart(runMeta);
-
-  for (const [hash, reason] of cherrySkipped) {
-    const c = allSourceCommits.find((x) => x.hash === hash);
-    if (c) audit.cherrySkip(hash, c.message, reason);
-  }
-
-  // ── Resume check ────────────────────────────────────────────────────
+  // ── Resume check (before creating new audit, so we can reuse the old run) ──
   let resumeFromIndex = 0;
+  let resumedRunId: string | undefined;
   if (opts.resume && effectiveWorkBranch) {
-    // Check the worktree location (persistent branch root in the repo)
     const resumeInfo = findResumableRun(repoPath, effectiveWorkBranch);
     if (resumeInfo && resumeInfo.lastCommitIndex >= 0) {
-      // Restore previous decisions and skip those commits
       const prevHashes = new Set(resumeInfo.decisions.map((d) => d.commitHash));
       for (const d of resumeInfo.decisions) {
         decisions.push(d);
         updateSummary(summary, d);
       }
-      // Find resume point: first commit not in previous decisions
       resumeFromIndex = commitsToProcess.findIndex((c) => !prevHashes.has(c.hash));
-      if (resumeFromIndex < 0) resumeFromIndex = commitsToProcess.length; // all done
+      if (resumeFromIndex < 0) resumeFromIndex = commitsToProcess.length;
+      resumedRunId = resumeInfo.runId;
       cb.onLog(
-        `Resuming from commit ${resumeFromIndex + 1}/${commitsToProcess.length} (${resumeInfo.decisions.length} already decided)`,
+        `Resuming run ${resumeInfo.runId} from commit ${resumeFromIndex + 1}/${commitsToProcess.length} (${resumeInfo.decisions.length} already decided)`,
         "green",
       );
+    }
+  }
+
+  // ── Audit — written to the repo root, NOT the eval worktree ─────────
+  const runId = resumedRunId ?? `run-${ts}`;
+  const audit = new AuditLogClass(repoPath, runId);
+  if (!resumedRunId) {
+    const runMeta: RunMetadata = {
+      runId,
+      startedAt: new Date().toISOString(),
+      sourceRef,
+      targetRef,
+      workBranch: wbName,
+      mergeBase,
+      worktreePath: wtPath,
+      totalCandidates: commitsToProcess.length,
+      cherrySkipped: cherrySkipped.size,
+      dryRun,
+      repoPath,
+    };
+    audit.runStart(runMeta);
+
+    for (const [hash, reason] of cherrySkipped) {
+      const c = allSourceCommits.find((x) => x.hash === hash);
+      if (c) audit.cherrySkip(hash, c.message, reason);
     }
   }
 
