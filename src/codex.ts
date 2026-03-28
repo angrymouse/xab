@@ -193,7 +193,7 @@ async function runStreamedWithProgress(
             if (output) {
               const lines = output.split("\n").filter(Boolean);
               for (const line of lines.slice(-3)) {
-                onProgress("exec", `  ${line.slice(0, 120)}`);
+                onProgress("output", `  ${line.slice(0, 120)}`);
               }
             }
           }
@@ -226,10 +226,10 @@ async function runStreamedWithProgress(
         case "reasoning": {
           const text = (item.text as string) ?? "";
           if (text) {
-            // Show reasoning as it arrives (both started and completed)
             const lines = text.split("\n").filter(Boolean);
-            for (const line of lines.slice(0, 3)) {
-              onProgress("think", line.slice(0, 150));
+            if (lines[0]) onProgress("think", lines[0].slice(0, 150));
+            for (const line of lines.slice(1, 3)) {
+              onProgress("output", `  ${line.slice(0, 150)}`);
             }
           }
           break;
