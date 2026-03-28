@@ -126,37 +126,37 @@ export async function runBatch(opts: EngineOptions & { jsonl?: boolean }): Promi
       let icon: string;
       switch (sub) {
         case "read":
-          icon = chalk.cyan("📖");
+          icon = chalk.cyan("r");
           break;
         case "grep":
-          icon = chalk.cyan("🔍");
+          icon = chalk.cyan("g");
           break;
         case "glob":
-          icon = chalk.cyan("📂");
+          icon = chalk.cyan("f");
           break;
         case "exec":
-          icon = chalk.yellow("⚡");
+          icon = chalk.yellow("$");
           break;
         case "file":
-          icon = chalk.green("✏️");
+          icon = chalk.green("~");
           break;
         case "think":
-          icon = chalk.blue("💭");
+          icon = chalk.blue(">");
           break;
         case "tool":
-          icon = chalk.dim("🔧");
+          icon = chalk.dim("t");
           break;
         case "analyze":
-          icon = chalk.blue("◆");
+          icon = chalk.blue("a");
           break;
         case "apply":
-          icon = chalk.green("▸");
+          icon = chalk.green("+");
           break;
         case "review":
-          icon = chalk.magenta("●");
+          icon = chalk.magenta("*");
           break;
         default:
-          icon = chalk.dim("·");
+          icon = chalk.dim(".");
           break;
       }
       log(`  ${ts()} ${icon} ${chalk.dim(text)}`);
