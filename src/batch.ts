@@ -177,6 +177,11 @@ export async function runBatch(opts: EngineOptions & { jsonl?: boolean }): Promi
       if (analysis.opsNotes.length > 0) {
         log(`  ${chalk.yellow("  ops:")} ${analysis.opsNotes.join("; ")}`);
       }
+      if (analysis.discoveries && analysis.discoveries.length > 0) {
+        for (const d of analysis.discoveries) {
+          log(`  ${chalk.cyan(`  💡 [${d.type}] ${d.key}:`)} ${d.value}`);
+        }
+      }
     },
 
     onDecision(commit: CommitInfo, decision: Decision) {

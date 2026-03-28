@@ -255,6 +255,7 @@ export function buildCommitContext(
   config: BackmergeConfig,
   touchedPaths: string[],
   commitMessage: string,
+  memoryBlock?: string,
 ): CommitContext {
   const includedFiles: string[] = [];
   const sections: string[] = [];
@@ -267,7 +268,12 @@ export function buildCommitContext(
   if (rs.packages?.length) structLines.push(`Packages: ${rs.packages.join(", ")}`);
   sections.push(structLines.join("\n"));
 
-  // 2. Instruction files (always included, already capped)
+  // 2. Merge memory (learnings from previous commits in this run)
+  if (memoryBlock) {
+    sections.push(memoryBlock);
+  }
+
+  // 3. Instruction files (always included, already capped)
   for (const [name, content] of repoCtx.instructions) {
     sections.push(`--- ${name} ---\n${content}`);
     includedFiles.push(name);

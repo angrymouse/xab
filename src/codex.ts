@@ -18,6 +18,10 @@ export interface CommitAnalysis {
   affectedComponents: string[];
   /** Ops notes — only populated when the commit requires operator action beyond a code deploy */
   opsNotes: string[];
+  /** Discoveries — reusable learnings for future commits (path mappings, patterns, codebase facts) */
+  discoveries: Array<{ type: string; key: string; value: string }>;
+  /** Memory GC — keys from the merge memory that are still useful. Omitted keys get dropped. */
+  keepMemoryKeys: string[];
 }
 
 export interface ApplyResult {
@@ -54,8 +58,44 @@ const analysisSchema = {
       description:
         "Operator action items ONLY if this commit requires something beyond a standard code deploy+restart. Examples: new env vars to add, database migrations to run, new services to deploy, infrastructure changes, config file updates on servers. Leave as empty array [] if no operator action is needed — a normal code deploy does NOT count.",
     },
+    discoveries: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          type: {
+            type: "string",
+            enum: ["path_mapping", "pattern", "codebase", "architecture", "convention", "warning"],
+            description: "Category of discovery",
+          },
+          key: {
+            type: "string",
+            description: "Short unique key for dedup (e.g. 'frontend_path_prefix', 'pnl_shared_helpers')",
+          },
+          value: { type: "string", description: "The reusable fact (1-2 sentences max)" },
+        },
+        required: ["type", "key", "value"],
+      },
+      description:
+        "Reusable learnings that would help analyze FUTURE commits. Only include genuinely useful, non-obvious facts. Examples: path mappings between source and target ('frontend/' in source = 'apps/frontend/' in target), key shared functions ('betExitValueLocal() is the canonical P&L helper'), architectural patterns ('store exports are at the bottom of the file'), conventions ('pt-BR locale used in all user-facing text'). Leave as [] if nothing non-obvious was discovered.",
+    },
+    keepMemoryKeys: {
+      type: "array",
+      items: { type: "string" },
+      description:
+        "From the merge memory provided in context, list the KEYS of entries that are still useful for future commits. Entries whose keys are NOT listed here will be garbage-collected. If no merge memory was provided, return []. Be selective — only keep entries that are genuinely useful going forward, not stale or obvious facts.",
+    },
   },
-  required: ["summary", "alreadyInTarget", "reasoning", "applicationStrategy", "affectedComponents", "opsNotes"],
+  required: [
+    "summary",
+    "alreadyInTarget",
+    "reasoning",
+    "applicationStrategy",
+    "affectedComponents",
+    "opsNotes",
+    "discoveries",
+    "keepMemoryKeys",
+  ],
   additionalProperties: false,
 } as const;
 
@@ -335,7 +375,18 @@ You are looking at a worktree based on the TARGET branch "${opts.targetBranch}".
    - New services, containers, or infrastructure to deploy? → note what
    - Config files that need manual updates on servers? → note which
    - Dependencies on external services being added or removed? → note what
-   - If the commit is just normal code changes that only need a deploy+restart, leave opsNotes as []`;
+   - If the commit is just normal code changes that only need a deploy+restart, leave opsNotes as []
+8. Record any non-obvious discoveries that would help analyze FUTURE commits:
+   - Path mappings between source and target branches (e.g. "frontend/ in source = apps/frontend/ in target")
+   - Key functions, helpers, or patterns you found (e.g. "betExitValueLocal() is the shared P&L helper")
+   - Architectural facts (e.g. "store exports are at the bottom of fastMarkets.ts")
+   - Only include genuinely useful, non-obvious facts. Do NOT repeat things already in the merge memory or repo docs.
+   - Leave discoveries as [] if nothing new and non-obvious was found.
+9. If merge memory entries were provided in the context above, evaluate each one:
+   - List the KEYS of entries you want to KEEP in keepMemoryKeys
+   - Drop entries that are stale, obvious from repo docs, or no longer relevant
+   - Keep entries that saved you time or would save time on similar future commits
+   - If no memory was provided, return keepMemoryKeys as []`;
 
   // Feed additional diff chunks if needed, then get structured output with streaming
   let response: string;
@@ -363,6 +414,8 @@ You are looking at a worktree based on the TARGET branch "${opts.targetBranch}".
     applicationStrategy: "Manual review recommended",
     affectedComponents: [],
     opsNotes: [],
+    discoveries: [],
+    keepMemoryKeys: [],
   });
 }
 

@@ -20,6 +20,7 @@ import { emptyRunSummary, updateSummary, validateDecision } from "./decisions.ts
 import { analyzeCommit, applyCommit, fixFromReview, checkCodexInstalled } from "./codex.ts";
 import { reviewAppliedDiff, writeReviewPacket, verifyReviewIntegrity } from "./review.ts";
 import { AuditLog as AuditLogClass, findResumableRun } from "./audit.ts";
+import { MergeMemory } from "./memory.ts";
 import {
   createGit,
   isGitRepo,
@@ -133,6 +134,12 @@ export async function runEngine(opts: EngineOptions, cb: EngineCallbacks): Promi
     cb.onStatus("Fetching remotes...");
     const logs = await fetchAndReset(git, []);
     for (const l of logs) cb.onLog(`  ${l}`, "gray");
+  }
+
+  // ── Merge memory ────────────────────────────────────────────────────
+  const memory = new MergeMemory(repoPath);
+  if (memory.count > 0) {
+    cb.onLog(`Merge memory: ${memory.count} entries from previous commits`, "cyan");
   }
 
   // ── Log active hints ────────────────────────────────────────────────
@@ -344,6 +351,7 @@ export async function runEngine(opts: EngineOptions, cb: EngineCallbacks): Promi
       maxAttempts: effectiveMaxAttempts,
       commitPrefix,
       workBranch: wbName,
+      memory,
       workBranchHead: currentBranchHead,
     });
 
@@ -414,6 +422,8 @@ interface ProcessOpts {
   commitPrefix: string;
   /** Persistent branch name — advanced after successful apply */
   workBranch: string;
+  /** Merge memory instance */
+  memory: MergeMemory;
   /** Where the persistent branch pointed before this commit (for CAS) */
   workBranchHead: string;
 }
@@ -430,7 +440,14 @@ async function processOneCommit(o: ProcessOpts): Promise<Decision> {
     /* fallback: no path info */
   }
 
-  const commitCtx = buildCommitContext(o.repoPath, o.repoCtx, o.config, touchedPaths, commit.message);
+  const commitCtx = buildCommitContext(
+    o.repoPath,
+    o.repoCtx,
+    o.config,
+    touchedPaths,
+    commit.message,
+    o.memory.toPromptBlock(),
+  );
   if (commitCtx.includedFiles.length > 0) {
     audit.writeRelevantDocs(commit.hash, 0, commitCtx.includedFiles.join("\n"));
   }
@@ -461,6 +478,22 @@ async function processOneCommit(o: ProcessOpts): Promise<Decision> {
     });
     audit.writeAnalysis(commit.hash, 1, analysis as unknown as Record<string, unknown>);
     cb.onAnalysis(commit, analysis);
+
+    // ── Update merge memory ────────────────────────────────────────
+    if (analysis.discoveries && analysis.discoveries.length > 0) {
+      const added = o.memory.addDiscoveries(analysis.discoveries, commit.hash);
+      if (added > 0) {
+        cb.onLog(`Memory: +${added} new discoveries (${o.memory.count} total)`, "cyan");
+      }
+    }
+    // GC: keep only what the AI said is useful
+    if (o.memory.count > 0 && analysis.keepMemoryKeys) {
+      const kept = o.memory.all.filter((e) => analysis.keepMemoryKeys.includes(e.key));
+      const gcCount = o.memory.applyGC(kept.map((e) => ({ key: e.key, value: e.value })));
+      if (gcCount > 0) {
+        cb.onLog(`Memory: GC'd ${gcCount} stale entries (${o.memory.count} remaining)`, "gray");
+      }
+    }
   } catch (e) {
     audit.error("analysis", commit.hash, commit.message, (e as Error).message);
     return mkFailed(commit, "analysis", (e as Error).message, start);

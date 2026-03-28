@@ -1,6 +1,6 @@
 {
   "name": "xab",
-  "version": "11.0.0",
+  "version": "12.0.0",
   "description": "AI-powered curated branch reconciliation engine",
   "type": "module",
   "bin": {
@@ -33,6 +33,6 @@
     "ink-text-input": "^6.0.0",
     "react": "18.3.1",
     "simple-git": "^3.33.0",
-    "xab": "^5.0.0"
+    "xab": "12"
   }
 }
