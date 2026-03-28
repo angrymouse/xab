@@ -26,6 +26,7 @@ let batch = false;
 let jsonl = false;
 let resume = true; // resume by default
 let showHelp = false;
+const hints: string[] = [];
 
 for (let i = 0; i < args.length; i++) {
   const arg = args[i]!;
@@ -51,6 +52,7 @@ for (let i = 0; i < args.length; i++) {
   else if (arg === "--limit" && args[i + 1]) limit = parseInt(args[++i]!, 10) || 0;
   else if (arg === "--max-attempts" && args[i + 1]) maxAttempts = parseInt(args[++i]!, 10) || 2;
   else if (arg === "--config" && args[i + 1]) configPath = args[++i]!;
+  else if (arg === "--hint" && args[i + 1]) hints.push(args[++i]!);
   else if (!arg.startsWith("-")) repoPath = arg;
 }
 
@@ -87,6 +89,7 @@ Behavior:
   --no-auto-skip          Don't auto-skip commits AI identifies as present
   --max-attempts <n>      Max retries per commit (default: unlimited)
   --no-resume             Don't resume from interrupted runs (default: auto-resume)
+  --hint <text>           Operator hint injected into AI prompts (repeatable)
   --config <path>         Path to config file (default: auto-discover)
   --help, -h              Show this help
 
@@ -148,6 +151,7 @@ const engineOpts: Partial<EngineOptions> = {
   review,
   autoSkip,
   resume,
+  ...(hints.length > 0 && { hints }),
   maxAttempts,
   ...(startAfter && { startAfter }),
   ...(limit > 0 && { limit }),

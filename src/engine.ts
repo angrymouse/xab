@@ -65,6 +65,8 @@ export interface EngineOptions {
   configPath?: string;
   /** Resume from the last interrupted run (auto-detected from work branch) */
   resume?: boolean;
+  /** Ad-hoc operator hints injected into every AI prompt (from --hint flags) */
+  hints?: string[];
 }
 
 /** Callback interface for frontends to receive progress events */
@@ -110,6 +112,10 @@ export async function runEngine(opts: EngineOptions, cb: EngineCallbacks): Promi
 
   // ── Config & context ─────────────────────────────────────────────────
   const config = loadConfig(repoPath, opts.configPath);
+  // Merge CLI hints with config hints
+  if (opts.hints?.length) {
+    config.promptHints = [...(config.promptHints ?? []), ...opts.hints];
+  }
   const effectiveMaxAttempts = opts.maxAttempts ?? config.maxAttempts ?? Infinity;
   const effectiveWorkBranch = opts.workBranch ?? config.workBranch;
   const commitPrefix = config.commitPrefix ?? "backmerge:";
@@ -127,6 +133,14 @@ export async function runEngine(opts: EngineOptions, cb: EngineCallbacks): Promi
     cb.onStatus("Fetching remotes...");
     const logs = await fetchAndReset(git, []);
     for (const l of logs) cb.onLog(`  ${l}`, "gray");
+  }
+
+  // ── Log active hints ────────────────────────────────────────────────
+  if (config.promptHints && config.promptHints.length > 0) {
+    cb.onLog(`Active hints (${config.promptHints.length}):`, "cyan");
+    for (const h of config.promptHints) {
+      cb.onLog(`  → ${h}`, "cyan");
+    }
   }
 
   // ── Repo context ─────────────────────────────────────────────────────
