@@ -13,16 +13,7 @@ import type { EngineOptions, EngineCallbacks, EngineResult } from "./engine.ts";
 import { runEngine } from "./engine.ts";
 import { getBranches, createGit, isGitRepo } from "./git.ts";
 import { checkCodexInstalled } from "./codex.ts";
-import { readFileSync } from "fs";
-import { join } from "path";
-
-const XAB_VERSION = (() => {
-  try {
-    return JSON.parse(readFileSync(join(import.meta.dir, "..", "package.json"), "utf-8")).version ?? "?";
-  } catch {
-    return "?";
-  }
-})();
+import { VERSION as XAB_VERSION } from "./version.ts";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

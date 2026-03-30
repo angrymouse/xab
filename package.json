@@ -11,7 +11,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "bun build index.ts --outdir dist --target bun --format esm --external @anthropic-ai/claude-agent-sdk --external @openai/codex-sdk --external simple-git --external ink --external ink-select-input --external ink-spinner --external ink-text-input --external react --external chalk",
+    "build": "node -e \"fs.writeFileSync('src/version.ts','export const VERSION='+JSON.stringify(require('./package.json').version)+';\\n')\" && bun build index.ts --outdir dist --target bun --format esm --external @anthropic-ai/claude-agent-sdk --external @openai/codex-sdk --external simple-git --external ink --external ink-select-input --external ink-spinner --external ink-text-input --external react --external chalk",
     "prepublishOnly": "bun run build",
     "start": "bun run index.ts",
     "dev": "bun run --watch index.ts"

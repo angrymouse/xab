@@ -56,11 +56,10 @@ for (let i = 0; i < args.length; i++) {
   else if (!arg.startsWith("-")) repoPath = arg;
 }
 
+import { VERSION } from "./src/version.ts";
+
 if (showHelp) {
-  let version = "?";
-  try {
-    version = JSON.parse(await Bun.file(new URL("./package.json", import.meta.url).pathname).text()).version;
-  } catch {}
+  const version = VERSION;
   console.log(`
 xab v${version} — AI-powered curated branch reconciliation
 
