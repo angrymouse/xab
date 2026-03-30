@@ -481,7 +481,20 @@ async function processOneCommit(o: ProcessOpts): Promise<Decision> {
 
     // ── Update merge memory ────────────────────────────────────────
     if (analysis.discoveries && analysis.discoveries.length > 0) {
-      const added = o.memory.addDiscoveries(analysis.discoveries, commit.hash);
+      // Parse "type:key:value" strings into structured objects
+      const parsed = analysis.discoveries.map((d) => {
+        const firstColon = d.indexOf(":");
+        const secondColon = firstColon >= 0 ? d.indexOf(":", firstColon + 1) : -1;
+        if (secondColon >= 0) {
+          return {
+            type: d.slice(0, firstColon),
+            key: d.slice(firstColon + 1, secondColon),
+            value: d.slice(secondColon + 1),
+          };
+        }
+        return { type: "pattern", key: d.slice(0, 30), value: d };
+      });
+      const added = o.memory.addDiscoveries(parsed, commit.hash);
       if (added > 0) {
         cb.onLog(`Memory: +${added} new discoveries (${o.memory.count} total)`, "cyan");
       }

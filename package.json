@@ -1,6 +1,6 @@
 {
   "name": "xab",
-  "version": "12.0.0",
+  "version": "14.0.0",
   "description": "AI-powered curated branch reconciliation engine",
   "type": "module",
   "bin": {

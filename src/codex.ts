@@ -18,8 +18,8 @@ export interface CommitAnalysis {
   affectedComponents: string[];
   /** Ops notes — only populated when the commit requires operator action beyond a code deploy */
   opsNotes: string[];
-  /** Discoveries — reusable learnings for future commits (path mappings, patterns, codebase facts) */
-  discoveries: Array<{ type: string; key: string; value: string }>;
+  /** Discoveries — formatted as "type:key:value" strings */
+  discoveries: string[];
   /** Memory GC — keys from the merge memory that are still useful. Omitted keys get dropped. */
   keepMemoryKeys: string[];
 }
@@ -60,24 +60,9 @@ const analysisSchema = {
     },
     discoveries: {
       type: "array",
-      items: {
-        type: "object",
-        properties: {
-          type: {
-            type: "string",
-            enum: ["path_mapping", "pattern", "codebase", "architecture", "convention", "warning"],
-            description: "Category of discovery",
-          },
-          key: {
-            type: "string",
-            description: "Short unique key for dedup (e.g. 'frontend_path_prefix', 'pnl_shared_helpers')",
-          },
-          value: { type: "string", description: "The reusable fact (1-2 sentences max)" },
-        },
-        required: ["type", "key", "value"],
-      },
+      items: { type: "string" },
       description:
-        "Reusable learnings that would help analyze FUTURE commits. Only include genuinely useful, non-obvious facts. Examples: path mappings between source and target ('frontend/' in source = 'apps/frontend/' in target), key shared functions ('betExitValueLocal() is the canonical P&L helper'), architectural patterns ('store exports are at the bottom of the file'), conventions ('pt-BR locale used in all user-facing text'). Leave as [] if nothing non-obvious was discovered.",
+        "Reusable learnings for FUTURE commits, formatted as 'type:key:value'. Types: path_mapping, pattern, codebase, architecture, convention, warning. Examples: 'path_mapping:frontend_prefix:frontend/ in source = apps/frontend/ in target', 'codebase:pnl_helpers:betExitValueLocal() is the shared P&L function'. Only non-obvious facts. Leave as [] if nothing new.",
     },
     keepMemoryKeys: {
       type: "array",

@@ -179,7 +179,7 @@ export async function runBatch(opts: EngineOptions & { jsonl?: boolean }): Promi
       }
       if (analysis.discoveries && analysis.discoveries.length > 0) {
         for (const d of analysis.discoveries) {
-          log(`  ${chalk.cyan(`  💡 [${d.type}] ${d.key}:`)} ${d.value}`);
+          log(`  ${chalk.cyan(`  💡 ${d}`)}`);
         }
       }
     },

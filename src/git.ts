@@ -119,7 +119,8 @@ export async function createDetachedWorktree(git: SimpleGit, path: string, ref: 
 /**
  * Advance a branch ref with compare-and-swap.
  * Only updates if the branch currently points to `expectedOld`.
- * Throws if the ref was moved concurrently.
+ * Retries on transient lock failures (stale .lock files, concurrent git ops).
+ * Throws if it fails after retries or if the ref was moved concurrently.
  */
 export async function advanceBranch(
   git: SimpleGit,
@@ -127,7 +128,30 @@ export async function advanceBranch(
   newRef: string,
   expectedOld: string,
 ): Promise<void> {
-  await git.raw(["update-ref", `refs/heads/${branch}`, newRef, expectedOld]);
+  const maxRetries = 5;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      // Clean stale lock file if present
+      const repoRoot = (await git.raw(["rev-parse", "--git-common-dir"])).trim();
+      const lockPath = `${repoRoot}/refs/heads/${branch}.lock`;
+      try {
+        const { unlinkSync, existsSync } = await import("fs");
+        if (existsSync(lockPath)) unlinkSync(lockPath);
+      } catch {
+        /* ignore */
+      }
+
+      await git.raw(["update-ref", `refs/heads/${branch}`, newRef, expectedOld]);
+      return;
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (msg.includes("cannot lock ref") && i < maxRetries - 1) {
+        await new Promise((r) => setTimeout(r, 200 * (i + 1)));
+        continue;
+      }
+      throw e;
+    }
+  }
 }
 
 export async function removeWorktree(git: SimpleGit, path: string): Promise<void> {
